@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sales Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#eef2f6;--panel:#fff;--ink:#14213d;--mute:#5d6b82;--line:#d8e0ea;--teal:#0f766e;--amber:#d98e04;--blue:#2f5fd0;--rose:#c2410c;--good:#0f766e;--bad:#b42318}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Manrope,system-ui,sans-serif;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 48px}
+header{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-end;margin-bottom:24px}
+h1{margin:0;font-size:1.9rem;font-weight:800;letter-spacing:-.02em}
+header p{margin:2px 0 0;color:var(--mute);font-size:.95rem}
+.filters{display:flex;gap:12px}
+label{display:flex;flex-direction:column;font-size:.8rem;color:var(--mute);gap:4px}
+select{font:inherit;font-size:.95rem;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+select:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.kpi span{font-size:.85rem;color:var(--mute)}
+.kpi b{display:block;font-size:1.7rem;font-weight:800;letter-spacing:-.02em}
+.kpi small{font-size:.82rem;font-weight:600}
+.up{color:var(--good)}.down{color:var(--bad)}.flat{color:var(--mute)}
+.grid{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px}
+.grid.two{grid-template-columns:1fr 1fr}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;min-width:0}
+.card h2{margin:0 0 12px;font-size:1rem;font-weight:700}
+.chart{position:relative;height:280px}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th,td{text-align:left;padding:9px 6px;border-bottom:1px solid var(--line)}
+th{font-weight:600;color:var(--mute);font-size:.85rem}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+footer{margin-top:20px;color:var(--mute);font-size:.82rem}
+@media(max-width:860px){.kpis{grid-template-columns:repeat(2,1fr)}.grid,.grid.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Sales Dashboard</h1>
+      <p>Revenue, orders and product performance, 2024 to 2025</p>
+    </div>
+    <div class="filters">
+      <label>Year<select id="year"><option value="all">All years</option><option value="2025" selected>2025</option><option value="2024">2024</option></select></label>
+      <label>Region<select id="region"></select></label>
+    </div>
+  </header>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="grid">
+    <div class="card"><h2>Monthly revenue</h2><div class="chart"><canvas id="cMonth" role="img" aria-label="Monthly revenue line chart"></canvas></div></div>
+    <div class="card"><h2>Revenue by region</h2><div class="chart"><canvas id="cRegion" role="img" aria-label="Revenue by region chart"></canvas></div></div>
+  </section>
+
+  <section class="grid two">
+    <div class="card"><h2>Revenue by category</h2><div class="chart"><canvas id="cCat" role="img" aria-label="Revenue by category bar chart"></canvas></div></div>
+    <div class="card"><h2>Top products</h2><div class="scroll"><table>
+      <thead><tr><th>Product</th><th>Category</th><th class="n">Units</th><th class="n">Revenue</th></tr></thead>
+      <tbody id="tbody"></tbody></table></div></div>
+  </section>
+
+  <footer>Sample data generated in the browser. Replace the <code>buildData()</code> function in index.html with your own records to use real numbers.</footer>
+</div>
+
+<script>
+const REGIONS=['North','South','East','West'];
+const PRODUCTS=[
+  ['Laptop Pro','Electronics',1200],['Wireless Earbuds','Electronics',90],['Smart Watch','Electronics',220],
+  ['Office Chair','Furniture',180],['Standing Desk','Furniture',420],['Bookshelf','Furniture',130],
+  ['Running Shoes','Apparel',85],['Rain Jacket','Apparel',110],['Denim Jeans','Apparel',60],
+  ['Blender','Home',70],['Air Fryer','Home',120],['Vacuum Robot','Home',320]
+];
+const CATS=[...new Set(PRODUCTS.map(p=>p[1]))];
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const COLORS=['#0f766e','#2f5fd0','#d98e04','#c2410c'];
+
+// Replace this with your own data: one row per year/month/region/product
+function buildData(){
+  let s=42;const rnd=()=>(s=(s*16807)%2147483647)/2147483647;
+  const rows=[];
+  [2024,2025].forEach((y,yi)=>MONTHS.forEach((m,mi)=>REGIONS.forEach((r,ri)=>PRODUCTS.forEach(([name,cat,price])=>{
+    const season=1+0.25*Math.sin((mi-2)/12*2*Math.PI)+(mi>=9?0.2:0);
+    const units=Math.round((10+rnd()*14)*season*(1+yi*0.14)*(1+ri*0.06)*(price>400?0.25:price>200?0.5:1));
+    rows.push({y,m:mi,r,cat,name,units,rev:units*price,orders:Math.max(1,Math.round(units/(1+rnd()*1.5)))});
+  }))));
+  return rows;
+}
+const DATA=buildData();
+
+const $=id=>document.getElementById(id);
+const money=n=>'$'+Math.round(n).toLocaleString('en-US');
+const fmt=n=>n>=1e6?'$'+(n/1e6).toFixed(2)+'M':n>=1e3?'$'+(n/1e3).toFixed(0)+'K':'$'+n;
+const sum=(a,k)=>a.reduce((t,x)=>t+x[k],0);
+
+$('region').innerHTML='<option value="all">All regions</option>'+REGIONS.map(r=>`<option>${r}</option>`).join('');
+
+const charts={};
+function draw(id,cfg){if(charts[id])charts[id].destroy();charts[id]=new Chart($(id),cfg)}
+Chart.defaults.font.family='Manrope,system-ui,sans-serif';
+Chart.defaults.color='#5d6b82';
+
+function render(){
+  const yr=$('year').value,rg=$('region').value;
+  const reg=DATA.filter(d=>rg==='all'||d.r===rg);
+  const cur=reg.filter(d=>yr==='all'||d.y==yr);
+  const prev=yr==='2025'?reg.filter(d=>d.y===2024):null;
+
+  const rev=sum(cur,'rev'),ord=sum(cur,'orders'),units=sum(cur,'units');
+  const delta=(a,b)=>{if(!prev)return '<small class="flat">&nbsp;</small>';const p=(a/b-1)*100;
+    return `<small class="${p>=0?'up':'down'}">${p>=0?'+':''}${p.toFixed(1)}% vs 2024</small>`};
+  const pr=prev?sum(prev,'rev'):0,po=prev?sum(prev,'orders'):0,pu=prev?sum(prev,'units'):0;
+  $('kpis').innerHTML=[
+    ['Revenue',money(rev),delta(rev,pr)],
+    ['Orders',ord.toLocaleString('en-US'),delta(ord,po)],
+    ['Avg. order value',money(rev/ord),delta(rev/ord,pr/po)],
+    ['Units sold',units.toLocaleString('en-US'),delta(units,pu)]
+  ].map(([l,v,d])=>`<div class="kpi"><span>${l}</span><b>${v}</b>${d}</div>`).join('');
+
+  const byMonth=(rows,y)=>MONTHS.map((_,i)=>sum(rows.filter(d=>d.m===i&&(y==null||d.y===y)),'rev'));
+  const lineSets=yr==='all'
+    ?[2024,2025].map((y,i)=>({label:String(y),data:byMonth(reg,y),borderColor:i?COLORS[0]:'#9aa8bd',borderDash:i?[]:[5,4],tension:.3,pointRadius:2}))
+    :[{label:yr,data:byMonth(cur,null),borderColor:COLORS[0],backgroundColor:'rgba(15,118,110,.1)',fill:true,tension:.3,pointRadius:2}]
+      .concat(prev?[{label:'2024',data:byMonth(prev,null),borderColor:'#9aa8bd',borderDash:[5,4],tension:.3,pointRadius:0}]:[]);
+  draw('cMonth',{type:'line',data:{labels:MONTHS,datasets:lineSets},options:{maintainAspectRatio:false,
+    scales:{y:{ticks:{callback:v=>fmt(v)},grid:{color:'#e6ecf3'}},x:{grid:{display:false}}},
+    plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${money(c.parsed.y)}`}}}}});
+
+  const byReg=REGIONS.map(r=>sum(cur.filter(d=>d.r===r),'rev'));
+  draw('cRegion',{type:'doughnut',data:{labels:REGIONS,datasets:[{data:byReg,backgroundColor:COLORS,borderWidth:2,borderColor:'#fff'}]},
+    options:{maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>`${c.label}: ${money(c.parsed)}`}}}}});
+
+  draw('cCat',{type:'bar',data:{labels:CATS,datasets:[{data:CATS.map(c=>sum(cur.filter(d=>d.cat===c),'rev')),backgroundColor:'#2f5fd0',borderRadius:4}]},
+    options:{maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>fmt(v)},grid:{color:'#e6ecf3'}},x:{grid:{display:false}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>money(c.parsed.y)}}}}});
+
+  const top=PRODUCTS.map(([n,c])=>{const r=cur.filter(d=>d.name===n);return{n,c,u:sum(r,'units'),v:sum(r,'rev')}})
+    .sort((a,b)=>b.v-a.v).slice(0,6);
+  $('tbody').innerHTML=top.map(t=>`<tr><td>${t.n}</td><td>${t.c}</td><td class="n">${t.u.toLocaleString('en-US')}</td><td class="n">${money(t.v)}</td></tr>`).join('');
+}
+$('year').onchange=$('region').onchange=render;
+render();
+</script>
+</body>
+</html>
